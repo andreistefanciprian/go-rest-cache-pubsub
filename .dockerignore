@@ -1,0 +1,28 @@
+# Ignore Git files
+.git
+.gitignore
+
+# Ignore documentation
+README.md
+*.md
+
+# Ignore temporary files
+*.tmp
+*.log
+
+# Ignore IDE files
+.vscode
+.idea
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore build artifacts
+main
+*.exe
+
+# Ignore Docker files (they're already in the image)
+Dockerfile
+docker-compose.yml
+.dockerignore
