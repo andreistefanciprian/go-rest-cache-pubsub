@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserRepository interface {
+type UserStorer interface {
 	CreateUser(user *User) error
 	GetUsers() ([]User, error)
 	GetUser(id int) (*User, error)
@@ -24,7 +24,7 @@ type UserRepository interface {
 	DeleteUser(id int) error
 }
 
-type userRepo struct {
+type PostgreSQLUserStorer struct {
 	db *gorm.DB
 }
 
@@ -35,7 +35,7 @@ type User struct {
 	Name string `json:"name"`
 }
 
-func (r *userRepo) UpdateUser(user *User, updates User) error {
+func (r *PostgreSQLUserStorer) UpdateUser(user *User, updates User) error {
 	// Simulate database delay
 	time.Sleep(500 * time.Millisecond)
 	fmt.Printf("Updating user %d in database\n", user.ID)
@@ -62,7 +62,7 @@ func (r *userRepo) UpdateUser(user *User, updates User) error {
 }
 
 // DeleteUser removes a user by ID from the database
-func (r *userRepo) DeleteUser(id int) error {
+func (r *PostgreSQLUserStorer) DeleteUser(id int) error {
 	// Simulate database delay
 	time.Sleep(500 * time.Millisecond)
 	fmt.Printf("Deleting user %d from database\n", id)
@@ -90,7 +90,7 @@ func (r *userRepo) DeleteUser(id int) error {
 }
 
 // GetUser retrieves a user by ID from the database
-func (r *userRepo) GetUser(id int) (*User, error) {
+func (r *PostgreSQLUserStorer) GetUser(id int) (*User, error) {
 	// Simulate database delay
 	time.Sleep(500 * time.Millisecond)
 	fmt.Printf("Getting user %d from database\n", id)
@@ -106,7 +106,7 @@ func (r *userRepo) GetUser(id int) (*User, error) {
 }
 
 // CreateUser creates a new user in the database
-func (r *userRepo) CreateUser(user *User) error {
+func (r *PostgreSQLUserStorer) CreateUser(user *User) error {
 	result := r.db.Create(user)
 	if result.Error != nil {
 		fmt.Println("Error creating user:", result.Error)
@@ -117,7 +117,7 @@ func (r *userRepo) CreateUser(user *User) error {
 }
 
 // GetUsers retrieves all users from the database
-func (r *userRepo) GetUsers() ([]User, error) {
+func (r *PostgreSQLUserStorer) GetUsers() ([]User, error) {
 	var users []User
 	result := r.db.Find(&users)
 	if result.Error != nil {
@@ -128,27 +128,27 @@ func (r *userRepo) GetUsers() ([]User, error) {
 	return users, nil
 }
 
-func newUserRepository(db *gorm.DB) UserRepository {
-	return &userRepo{db: db}
+func NewPostgreSQLUserStorer(db *gorm.DB) UserStorer {
+	return &PostgreSQLUserStorer{db: db}
 }
 
-type UserCache interface {
+type UserCacher interface {
 	Get(key string) (*User, error)
 	Set(key string, user *User) error
 	Del(key string) error
 }
 
-type redisClient struct {
+type RedisUserCacher struct {
 	client *redis.Client
 }
 
-// newRedisClient creates a new Redis client for caching user data
-func newRedisClient(cache *redis.Client) UserCache {
-	return &redisClient{client: cache}
+// NewRedisUserCacher creates a new Redis client for caching user data
+func NewRedisUserCacher(cache *redis.Client) UserCacher {
+	return &RedisUserCacher{client: cache}
 }
 
 // Del deletes a user from the Redis cache by key
-func (r *redisClient) Del(key string) error {
+func (r *RedisUserCacher) Del(key string) error {
 	result, err := r.client.Del(context.Background(), key).Result()
 	if err != nil {
 		fmt.Println("Error deleting user from cache:", err)
@@ -164,7 +164,7 @@ func (r *redisClient) Del(key string) error {
 }
 
 // Get retrieves a user from the Redis cache by key
-func (r *redisClient) Get(key string) (*User, error) {
+func (r *RedisUserCacher) Get(key string) (*User, error) {
 	val, err := r.client.Get(context.Background(), key).Result()
 	if err != nil {
 		// Check if it's a cache miss (key not found)
@@ -187,7 +187,7 @@ func (r *redisClient) Get(key string) (*User, error) {
 	return &user, nil
 }
 
-func (r *redisClient) Set(key string, user *User) error {
+func (r *RedisUserCacher) Set(key string, user *User) error {
 	userData, err := json.Marshal(user)
 	if err != nil {
 		fmt.Println("Error marshalling user data:", err)
@@ -202,7 +202,7 @@ func (r *redisClient) Set(key string, user *User) error {
 	return nil
 }
 
-type UserHandler interface {
+type HTTPUserHandler interface {
 	CreateUser(w http.ResponseWriter, r *http.Request)
 	GetAllUsers(w http.ResponseWriter, r *http.Request)
 	GetUserById(w http.ResponseWriter, r *http.Request)
@@ -211,14 +211,14 @@ type UserHandler interface {
 }
 
 type UserService struct {
-	repo  UserRepository
-	cache UserCache
+	storer UserStorer
+	cacher UserCacher
 }
 
-func NewUserService(repo UserRepository, cache UserCache) *UserService {
+func NewUserService(storer UserStorer, cacher UserCacher) HTTPUserHandler {
 	return &UserService{
-		repo:  repo,
-		cache: cache,
+		storer: storer,
+		cacher: cacher,
 	}
 }
 
@@ -259,7 +259,7 @@ func (s *UserService) UpdateUserById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := &User{Model: gorm.Model{ID: uint(id)}, Name: updates.Name}
-	if err := s.repo.UpdateUser(user, updates); err != nil {
+	if err := s.storer.UpdateUser(user, updates); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			http.Error(w, "Error: User not found", http.StatusNotFound)
 			fmt.Printf("Error: User %d not found\n", id)
@@ -270,7 +270,7 @@ func (s *UserService) UpdateUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.cache.Set(strconv.Itoa(id), user); err != nil {
+	if err := s.cacher.Set(strconv.Itoa(id), user); err != nil {
 		http.Error(w, "Error: Failed to update user in cache", http.StatusInternalServerError)
 		return
 	}
@@ -293,7 +293,7 @@ func (s *UserService) DeleteUserById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Try to delete from database first
-	if err := s.repo.DeleteUser(id); err != nil {
+	if err := s.storer.DeleteUser(id); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			http.Error(w, "Error: User not found", http.StatusNotFound)
 			return
@@ -304,7 +304,7 @@ func (s *UserService) DeleteUserById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete from cache
-	if err := s.cache.Del(strconv.Itoa(id)); err != nil {
+	if err := s.cacher.Del(strconv.Itoa(id)); err != nil {
 		http.Error(w, "Error: Failed to delete user from cache", http.StatusInternalServerError)
 		return
 	}
@@ -324,7 +324,7 @@ func (s *UserService) GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Check cache first
-	user, err := s.cache.Get(strconv.Itoa(id))
+	user, err := s.cacher.Get(strconv.Itoa(id))
 	if err != nil {
 		http.Error(w, "Error: Failed to retrieve user from cache", http.StatusInternalServerError)
 		return
@@ -335,7 +335,7 @@ func (s *UserService) GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// If not found in cache, retrieve from database
-	user, err = s.repo.GetUser(id)
+	user, err = s.storer.GetUser(id)
 	if err == gorm.ErrRecordNotFound {
 		http.Error(w, "Error: User not found", http.StatusNotFound)
 		fmt.Println("Error: User not found")
@@ -352,7 +352,7 @@ func (s *UserService) GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Store in cache for future requests
-	if err := s.cache.Set(strconv.Itoa(id), user); err != nil {
+	if err := s.cacher.Set(strconv.Itoa(id), user); err != nil {
 		http.Error(w, "Error: Failed to store user in cache", http.StatusInternalServerError)
 		return
 	}
@@ -376,7 +376,7 @@ func (s *UserService) CreateUser(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error: Name is required")
 		return
 	}
-	if err := s.repo.CreateUser(&user); err != nil {
+	if err := s.storer.CreateUser(&user); err != nil {
 		http.Error(w, "Error: Failed to create user", http.StatusInternalServerError)
 		fmt.Println("Error: Failed to create user")
 		return
@@ -391,7 +391,7 @@ func (s *UserService) CreateUser(w http.ResponseWriter, r *http.Request) {
 // If no users are found, it returns a 204 No Content status
 // If an error occurs, it returns a 500 Internal Server Error status
 func (s *UserService) GetAllUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := s.repo.GetUsers()
+	users, err := s.storer.GetUsers()
 	if err != nil {
 		http.Error(w, "Error: Failed to retrieve users", http.StatusInternalServerError)
 		fmt.Println("Error: Failed to retrieve users")
@@ -481,7 +481,7 @@ func main() {
 		fmt.Println("Error initializing database:", err)
 		return
 	}
-	userRepository := newUserRepository(db)
+	userStorer := NewPostgreSQLUserStorer(db)
 
 	// Initialize Redis cache
 	cache, err := initCache()
@@ -489,9 +489,9 @@ func main() {
 		fmt.Println("Error initializing Redis cache:", err)
 		return
 	}
-	userCache := newRedisClient(cache)
+	userCacher := NewRedisUserCacher(cache)
 
-	handler := NewUserService(userRepository, userCache)
+	handler := NewUserService(userStorer, userCacher)
 
 	// Set up HTTP server and routes
 	fmt.Println("Server is starting on port 8080...")
