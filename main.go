@@ -222,11 +222,26 @@ func NewUserService(repo UserRepository, cache UserCache) *UserService {
 	}
 }
 
+func validateId(id string) (int, error) {
+	if id == "" {
+		return 0, fmt.Errorf("ID is required")
+	}
+	idInt, err := strconv.Atoi(id)
+	if err != nil || idInt <= 0 {
+		return 0, fmt.Errorf("invalid ID format")
+	}
+	return idInt, nil
+}
+
+// UpdateUserById handles the update of a user by ID
+// It expects the ID to be passed in the request path as /users/{id}
+// It updates the user in both the database and the cache
+// It returns the updated user in JSON format or an error if the update fails
 func (s *UserService) UpdateUserById(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil || id <= 0 {
-		http.Error(w, "Error: Invalid ID format", http.StatusBadRequest)
-		fmt.Println("Error: Invalid ID format")
+	id, err := validateId(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error: %s", err.Error()), http.StatusBadRequest)
+		fmt.Println("Error:", err.Error())
 		return
 	}
 
@@ -270,10 +285,10 @@ func (s *UserService) UpdateUserById(w http.ResponseWriter, r *http.Request) {
 // It expects the ID to be passed in the request path as /users/{id}
 // It returns a 204 No Content status if successful, or an error if not
 func (s *UserService) DeleteUserById(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil || id <= 0 {
-		http.Error(w, "Error: Invalid ID format", http.StatusBadRequest)
-		fmt.Println("Error: Invalid ID format")
+	id, err := validateId(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error: %s", err.Error()), http.StatusBadRequest)
+		fmt.Println("Error:", err.Error())
 		return
 	}
 
@@ -299,24 +314,17 @@ func (s *UserService) DeleteUserById(w http.ResponseWriter, r *http.Request) {
 
 // GetUserById handles the retrieval of a user by ID
 // It first checks the cache, and if not found, retrieves from the database
+// It expects the ID to be passed in the request path as /users/{id}
+// It returns the user in JSON format or an error if not found
 func (s *UserService) GetUserById(w http.ResponseWriter, r *http.Request) {
-	// Extract ID from the request path
-	// Assuming the path is like /users/{id}
-	id := r.PathValue("id")
-	fmt.Println("Received request to get user by ID:", id)
-	if id == "" {
-		http.Error(w, "Error: ID is required", http.StatusBadRequest)
-		fmt.Println("Error: ID is required")
-		return
-	}
-	idInt, err := strconv.Atoi(id)
-	if err != nil || idInt <= 0 {
-		http.Error(w, "Error: Invalid ID format", http.StatusBadRequest)
-		fmt.Println("Error: Invalid ID format")
+	id, err := validateId(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error: %s", err.Error()), http.StatusBadRequest)
+		fmt.Println("Error:", err.Error())
 		return
 	}
 	// Check cache first
-	user, err := s.cache.Get(id)
+	user, err := s.cache.Get(strconv.Itoa(id))
 	if err != nil {
 		http.Error(w, "Error: Failed to retrieve user from cache", http.StatusInternalServerError)
 		return
@@ -327,7 +335,7 @@ func (s *UserService) GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// If not found in cache, retrieve from database
-	user, err = s.repo.GetUser(idInt)
+	user, err = s.repo.GetUser(id)
 	if err == gorm.ErrRecordNotFound {
 		http.Error(w, "Error: User not found", http.StatusNotFound)
 		fmt.Println("Error: User not found")
@@ -344,7 +352,7 @@ func (s *UserService) GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Store in cache for future requests
-	if err := s.cache.Set(id, user); err != nil {
+	if err := s.cache.Set(strconv.Itoa(id), user); err != nil {
 		http.Error(w, "Error: Failed to store user in cache", http.StatusInternalServerError)
 		return
 	}
@@ -354,6 +362,8 @@ func (s *UserService) GetUserById(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateUser handles the creation of a new user
+// It expects the user data in the request body as JSON
+// It validates the input and returns the created user in JSON format or an error if creation fails
 func (s *UserService) CreateUser(w http.ResponseWriter, r *http.Request) {
 	user := User{}
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
@@ -376,6 +386,10 @@ func (s *UserService) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+// GetAllUsers handles the retrieval of all users
+// It retrieves users from the database and returns them in JSON format
+// If no users are found, it returns a 204 No Content status
+// If an error occurs, it returns a 500 Internal Server Error status
 func (s *UserService) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := s.repo.GetUsers()
 	if err != nil {
@@ -446,6 +460,20 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+// withNotFoundHandler wraps the HTTP handler to return a 404 Not Found error
+// if the requested route does not match any registered handlers
+func withNotFoundHandler(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, pattern := mux.Handler(r)
+		if pattern == "" {
+			http.Error(w, "Error: Route not found", http.StatusNotFound)
+			fmt.Println("Error: Route not found for", r.Method, r.URL.Path)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Initialize database and cache
 	db, err := initDb()
@@ -473,5 +501,5 @@ func main() {
 	mux.HandleFunc("GET /users/{id}", handler.GetUserById)
 	mux.HandleFunc("PUT /users/{id}", handler.UpdateUserById)
 	mux.HandleFunc("DELETE /users/{id}", handler.DeleteUserById)
-	http.ListenAndServe(":8080", mux)
+	http.ListenAndServe(":8080", withNotFoundHandler(mux))
 }
