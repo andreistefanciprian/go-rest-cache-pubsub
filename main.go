@@ -303,7 +303,7 @@ func (s *UserService) DeleteUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete from cache (this can fail silently since cache might not have the user)
+	// Delete from cache
 	if err := s.cache.Del(strconv.Itoa(id)); err != nil {
 		http.Error(w, "Error: Failed to delete user from cache", http.StatusInternalServerError)
 		return
