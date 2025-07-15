@@ -2,7 +2,11 @@ module github.com/andreistefanciprian/learn_caching
 
 go 1.24.0
 
-require github.com/redis/go-redis/v9 v9.11.0
+require (
+	github.com/redis/go-redis/v9 v9.11.0
+	gorm.io/driver/postgres v1.6.0
+	gorm.io/gorm v1.30.0
+)
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -16,6 +20,4 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
-	gorm.io/driver/postgres v1.6.0 // indirect
-	gorm.io/gorm v1.30.0 // indirect
 )
