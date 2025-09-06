@@ -67,12 +67,3 @@ docker-compose down
 # Stop and remove volumes (clears data)
 docker-compose down -v
 ```
-
-## 🛠️ Tech Stack
-
-- **Backend**: Go 1.24.0
-- **Database**: PostgreSQL 15
-- **Cache**: Redis 7
-- **ORM**: GORM
-- **Containerization**: Docker & Docker Compose
-- **Base Image**: Google Distroless (security-focused)
