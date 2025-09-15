@@ -1,11 +1,11 @@
 module github.com/andreistefanciprian/go-rest-cache-pubsub
 
-go 1.25.0
+go 1.25.1
 
 require (
-	github.com/redis/go-redis/v9 v9.11.0
+	github.com/redis/go-redis/v9 v9.14.0
 	gorm.io/driver/postgres v1.6.0
-	gorm.io/gorm v1.30.0
+	gorm.io/gorm v1.31.0
 )
 
 require (
