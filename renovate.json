@@ -1,0 +1,48 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices", "docker:pinDigests", ":semanticCommits"],
+  "rangeStrategy": "bump",
+
+  "platformAutomerge": true,
+  "automergeType": "pr",
+
+  "prConcurrentLimit": 0,
+  "branchConcurrentLimit": 0,
+  "prHourlyLimit": 0,
+
+  "packageRules": [
+    {
+      "description": "Automerge go.mod minor/patch (with tidy)",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "postUpdateOptions": ["gomodTidy"],
+      "automerge": true,
+      "ignoreTests": true,
+      "groupName": "Go dependencies (minor/patch)",
+      "labels": ["renovate", "automerge"]
+    },
+    {
+      "description": "Automerge Dockerfile base images (safe bumps + digests)",
+      "matchManagers": ["dockerfile"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pinDigest"],
+      "automerge": true,
+      "ignoreTests": true,
+      "groupName": "Dockerfile base images",
+      "labels": ["renovate", "automerge"]
+    },
+    {
+      "description": "Automerge Docker Compose images (safe bumps + digests)",
+      "matchManagers": ["docker-compose"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pinDigest"],
+      "automerge": true,
+      "ignoreTests": true,
+      "groupName": "Docker Compose images",
+      "labels": ["renovate", "automerge"]
+    },
+    {
+      "description": "Never automerge majors anywhere",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}
