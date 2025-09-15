@@ -22,7 +22,7 @@ services:
       - app-network
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15-alpine@sha256:dfcf0459185089e88a43197975780f5a3078acd5ece84824a14c9d6fbbab02d0
     container_name: postgres_db
     restart: unless-stopped
     environment:
@@ -45,7 +45,7 @@ services:
       - app-network
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:bb186d083732f669da90be8b0f975a37812b15e913465bb14d845db72a4e3e08
     container_name: redis_cache
     restart: unless-stopped
     ports:
