@@ -1,6 +1,6 @@
-module github.com/andreistefanciprian/learn_caching
+module github.com/andreistefanciprian/go-rest-cache-pubsub
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/redis/go-redis/v9 v9.11.0
