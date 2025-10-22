@@ -22,7 +22,7 @@ services:
       - app-network
 
   postgres:
-    image: postgres:17-alpine@sha256:c5da6bc9da9e3a3b6dc85585078c05c002c2d4deeaca00479f5571e2d00ca5d2
+    image: postgres:17-alpine@sha256:8788e878c82f939891c5c7e17c402e0b715c1207ef6312de062eeea0cfe7b7ab
     container_name: postgres_db
     restart: unless-stopped
     environment:
