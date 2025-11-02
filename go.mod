@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	github.com/redis/go-redis/v9 v9.16.0
 	gorm.io/driver/postgres v1.6.0
-	gorm.io/gorm v1.31.0
+	gorm.io/gorm v1.31.1
 )
 
 require (
