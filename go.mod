@@ -1,6 +1,6 @@
 module github.com/andreistefanciprian/go-rest-cache-pubsub
 
-go 1.25.5
+go 1.25.6
 
 require (
 	github.com/redis/go-redis/v9 v9.17.2
